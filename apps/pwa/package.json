@@ -1,0 +1,19 @@
+{
+  "name": "gumby",
+  "version": "0.1.0",
+  "description": "Connecting wellness",
+  "main": "/dist/index.js",
+  "scripts": {
+    "dev": "gatsby develop",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Jim Hill <jim.hill.r@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "gatsby": "^4.9.3"
+  },
+  "dependencies": {
+    "plotly.js": "^2.11.0",
+    "react-plotly.js": "^2.5.1"
+  }
+}
