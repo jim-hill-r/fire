@@ -6,22 +6,56 @@ type Series = {
   y:number[]
 }
 
+enum Period {
+  MONTHLY,
+  ANNUALLY
+}
+
 type Cashflow = {
   amount:number
+  period: Period
   startDate:Date
   endDate:Date
 }
-const updatePrinciple = (principle, incomes, expenses, rates, currentMonth) => {
-  for(let income of incomes) {
-    principle += (income.amount / 12)
-  }
-  for(let expense of expenses) {
-    principle -= (expense.amount)
-  }
-  return principle
+
+type Rates = {
+  inflation:number
+  capital:number
 }
 
-const updateCash = (savings, incomes, expenses) => {
+type TaxBracket = {
+  rate:number
+  ceiling:number
+}
+
+type MarginalTax = {
+  brackets: TaxBracket[]
+}
+
+const subtractTaxes = (income) => {
+  return income * 0.7 //TODO: Add sophistication here. Make this an expense stream.
+}
+
+const calculateCashflow = (cashflows, currentMonth) => {
+  let total = 0
+  for(let cashflow of cashflows) {
+    if(cashflow.period === Period.MONTHLY) {
+      total += cashflow.amount
+    } else if (cashflow.period === Period.ANNUALLY) {
+      total += cashflow.amount / 12
+    }
+  }
+  return total
+}
+
+const updatePrinciple = (principle, incomes, expenses, rates, currentMonth) => {
+  const totalIncome = calculateCashflow(incomes, currentMonth)
+  const afterTaxIncome = subtractTaxes(totalIncome)
+  const totalExpense = calculateCashflow(expenses, currentMonth)
+  return (principle * (1 + rates.capital))// + afterTaxIncome - totalExpense
+}
+
+const updateCash = (savings, incomes, expenses, rates) => {
   const xLabels = []
   const yValues = []
   let principle = savings
@@ -30,7 +64,7 @@ const updateCash = (savings, incomes, expenses) => {
     for(let month = 1; month < 13; month++) {
       xLabels.push(`${year}-${month}`)
       yValues.push(principle)
-      principle = updatePrinciple(principle,incomes,expenses,null,currentMonth)
+      principle = updatePrinciple(principle,incomes,expenses,rates,currentMonth)
       currentMonth++;
     }
   }
@@ -43,21 +77,28 @@ export default function IndexPage() {
   const [ retirement, setRetirement ] = useState<number>(0)
   const [ income, setIncome ] = useState<Cashflow>({
     amount:70000, // ~Median US Income
+    period: Period.ANNUALLY,
     startDate:new Date(Date.now()),
     endDate:new Date(2050)
   })
   const [ rent, setRent ] = useState<Cashflow>({
     amount:1100, // Median US Rent
+    period: Period.MONTHLY,
     startDate:new Date(Date.now()),
     endDate:new Date(2050)
   })
-  const [ cash, setCash ] = useState<Series>(updateCash(savings+retirement,[income],[rent]))
+  const [ rates, setRates ] = useState<Rates>({
+    inflation: 0.02,
+    capital: 0.06
+  })
+  const [ retirementYear, setRetirementYear ] = useState<number>(2050)
+  const [ cash, setCash ] = useState<Series>(updateCash(savings+retirement,[income],[rent],rates))
 
   const onIncomeAmountChange = (event) => {
     setIncome((income) => {
       return {
         ...income,
-        amount: event.target.value
+        amount: parseInt(event.target.value)
       }
     })
   }
@@ -66,13 +107,37 @@ export default function IndexPage() {
     setRent((rent) => {
       return {
         ...rent,
-        amount: event.target.value
+        amount: parseInt(event.target.value)
       }
     })
   }
 
+  const onInflationChange = (event) => {
+    setRates((rates) => {
+      return {
+        ...rates,
+        inflation: parseFloat(event.target.value)
+      }
+    })
+  }
+
+  const onCapitalChange = (event) => {
+    setRates((rates) => {
+      return {
+        ...rates,
+        capital: parseFloat(event.target.value)
+      }
+    })
+  }
+
+  const onRetirementYearChange = (event) => {
+    setRetirementYear((rates) => {
+      return parseInt(event.target.value)
+    })
+  }
+
   const refresh = () => {
-    setCash(updateCash(savings+retirement,[income],[rent]))
+    setCash(updateCash(savings+retirement,[income],[rent],rates))
   }
 
   return (
@@ -96,6 +161,18 @@ export default function IndexPage() {
       <div>
         <label>Rent</label>
         <input type="number" value={rent.amount} onChange={onRentAmountChange}></input>
+      </div>
+      <div>
+        <label>Inflation Rate</label>
+        <input type="number" value={rates.inflation} onChange={onInflationChange}></input>
+      </div>
+      <div>
+        <label>Capital Gains Rate</label>
+        <input type="number" value={rates.capital} onChange={onCapitalChange}></input>
+      </div>
+      <div>
+        <label>Retirement Year</label>
+        <input type="number" value={retirementYear} onChange={onRetirementYearChange}></input>
       </div>
       <Plot
         data={[
