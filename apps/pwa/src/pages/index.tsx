@@ -36,36 +36,37 @@ const subtractTaxes = (income) => {
   return income * 0.7 //TODO: Add sophistication here. Make this an expense stream.
 }
 
-const calculateCashflow = (cashflows, currentMonth) => {
+const calculateCashflow = (cashflows, date) => {
   let total = 0
   for(let cashflow of cashflows) {
-    if(cashflow.period === Period.MONTHLY) {
-      total += cashflow.amount
-    } else if (cashflow.period === Period.ANNUALLY) {
-      total += cashflow.amount / 12
+    if (cashflow.startDate < date && cashflow.endDate > date) {
+      if(cashflow.period === Period.MONTHLY) {
+        total += cashflow.amount
+      } else if (cashflow.period === Period.ANNUALLY) {
+        total += cashflow.amount / 12
+      }
     }
   }
   return total
 }
 
-const updatePrinciple = (principle, incomes, expenses, rates, currentMonth) => {
-  const totalIncome = calculateCashflow(incomes, currentMonth)
+const updatePrinciple = (principle, incomes, expenses, rates, date) => {
+  const totalIncome = calculateCashflow(incomes, date)
   const afterTaxIncome = subtractTaxes(totalIncome)
-  const totalExpense = calculateCashflow(expenses, currentMonth)
-  return (principle * (1 + rates.capital))// + afterTaxIncome - totalExpense
+  const totalExpense = calculateCashflow(expenses, date)
+  return (principle * (1 + rates.capital / 12)) + afterTaxIncome - totalExpense
 }
 
 const updateCash = (savings, incomes, expenses, rates) => {
   const xLabels = []
   const yValues = []
   let principle = savings
-  let currentMonth = 0
   for(let year = 2022; year < 1984+100; year++) {
     for(let month = 1; month < 13; month++) {
+      const date = new Date(year,month)
       xLabels.push(`${year}-${month}`)
       yValues.push(principle)
-      principle = updatePrinciple(principle,incomes,expenses,rates,currentMonth)
-      currentMonth++;
+      principle = updatePrinciple(principle,incomes,expenses,rates,date)
     }
   }
   return {x:xLabels,y:yValues}
@@ -79,25 +80,49 @@ export default function IndexPage() {
     amount:70000, // ~Median US Income
     period: Period.ANNUALLY,
     startDate:new Date(Date.now()),
-    endDate:new Date(2050)
+    endDate:new Date(2050,1)
+  })
+  const [ survival, setSurvival ] = useState<Cashflow>({
+    amount:60000, // ~Median US Cost of Living
+    period: Period.ANNUALLY,
+    startDate:new Date(Date.now()),
+    endDate:new Date(2200,1)
   })
   const [ rent, setRent ] = useState<Cashflow>({
     amount:1100, // Median US Rent
     period: Period.MONTHLY,
     startDate:new Date(Date.now()),
-    endDate:new Date(2050)
+    endDate:new Date(2200,1)
   })
   const [ rates, setRates ] = useState<Rates>({
     inflation: 0.02,
     capital: 0.06
   })
   const [ retirementYear, setRetirementYear ] = useState<number>(2050)
-  const [ cash, setCash ] = useState<Series>(updateCash(savings+retirement,[income],[rent],rates))
+  const [ cash, setCash ] = useState<Series>(updateCash(savings+retirement,[income],[survival, rent],rates))
 
   const onIncomeAmountChange = (event) => {
     setIncome((income) => {
       return {
         ...income,
+        amount: parseInt(event.target.value)
+      }
+    })
+  }
+
+  const onIncomeRetirementDateChange = (event) => {
+    setIncome((income) => {
+      return {
+        ...income,
+        endDate: new Date(parseInt(event.target.value),1)
+      }
+    })
+  }
+
+  const onSurvivalAmountChange = (event) => {
+    setSurvival((survival) => {
+      return {
+        ...survival,
         amount: parseInt(event.target.value)
       }
     })
@@ -134,10 +159,11 @@ export default function IndexPage() {
     setRetirementYear((rates) => {
       return parseInt(event.target.value)
     })
+    onIncomeRetirementDateChange(event)
   }
 
   const refresh = () => {
-    setCash(updateCash(savings+retirement,[income],[rent],rates))
+    setCash(updateCash(savings+retirement,[income],[survival, rent],rates))
   }
 
   return (
@@ -159,15 +185,19 @@ export default function IndexPage() {
         <input type="number" value={income.amount} onChange={onIncomeAmountChange}></input>
       </div>
       <div>
+        <label>Annual Survival Expense</label>
+        <input type="number" value={survival.amount} onChange={onSurvivalAmountChange}></input>
+      </div>
+      <div>
         <label>Rent</label>
         <input type="number" value={rent.amount} onChange={onRentAmountChange}></input>
       </div>
       <div>
-        <label>Inflation Rate</label>
+        <label>Inflation Rate (APY)</label>
         <input type="number" value={rates.inflation} onChange={onInflationChange}></input>
       </div>
       <div>
-        <label>Capital Gains Rate</label>
+        <label>Capital Gains Rate (APY)</label>
         <input type="number" value={rates.capital} onChange={onCapitalChange}></input>
       </div>
       <div>

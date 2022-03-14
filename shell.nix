@@ -6,6 +6,6 @@ pkgs.mkShell {
         pkgs.nodejs
     ];
     shellHook = ''
-        echo "Welcome to Gumby development!"
+        echo "Welcome to FIRE development!"
     '';
 }
